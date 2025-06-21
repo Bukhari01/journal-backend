@@ -12,9 +12,10 @@ const router = express.Router();
 
 
 router.post('/register', register);
+router.post('/login', login);
 
 // Protected Routes
-router.post('/login',verifyToken, login);
+
 router.post('/logout', verifyToken, logout);
 router.post('/logout-all', verifyToken, logoutAll);
 

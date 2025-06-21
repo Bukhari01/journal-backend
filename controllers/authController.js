@@ -1,4 +1,3 @@
-// controllers/authController.js
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import useragent from 'useragent';
