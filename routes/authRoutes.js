@@ -7,6 +7,7 @@ import {
   logoutAll
 } from '../controllers/authController.js';
 import { verifyToken } from '../middlewares/authMiddleware.js';
+import { extractToken } from '../middlewares/tokenMiddleware.js';
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.post('/login', login);
 
 // Protected Routes
 
-router.post('/logout', verifyToken, logout);
+router.post('/logout', extractToken, logout);
 router.post('/logout-all', verifyToken, logoutAll);
 
 export default router;

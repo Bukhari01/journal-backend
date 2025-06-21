@@ -34,26 +34,55 @@ export const login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
 
     const token = generateToken(user._id);
-
-    // Session tracking
     const agent = useragent.parse(req.headers['user-agent']);
-    const sessionData = {
-      userId: user._id,
-      accessToken: token,
-      userAgent: agent.toString(),
-      ip: req.ip,
-    };
+    const userAgentString = agent.toString();
 
-    // Enforce 2-device session limit
-    const activeSessions = await Session.find({ userId: user._id, isActive: true }).sort({ createdAt: 1 });
-
-    if (activeSessions.length >= 2) {
-      const oldest = activeSessions[0];
-      oldest.isActive = false;
-      await oldest.save();
+    let device = agent.device.family;
+    if (device === 'Other') {
+      device = 'Desktop';
     }
 
-    await Session.create(sessionData);
+    let browserName = agent.family;
+    if (req.headers['user-agent'].includes('Edg/')) {
+      browserName = 'Edge';
+    }
+
+    const sessionQuery = {
+      userId: user._id,
+      browser: browserName,
+      os: agent.os.toString(),
+      device: device
+    };
+
+    const session = await Session.findOneAndUpdate(
+      sessionQuery,
+      {
+        $set: {
+          accessToken: token,
+          lastUsedAt: new Date(),
+          ip: req.ip,
+          isActive: true,
+          userAgent: userAgentString,
+        },
+        $setOnInsert: { createdAt: new Date(), browser: browserName, os: agent.os.toString(), device: device }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const isNewSession = Math.abs(session.createdAt.getTime() - session.lastUsedAt.getTime()) < 1000;
+
+    if (isNewSession) {
+      const activeSessions = await Session.find({ userId: user._id, isActive: true }).sort({ createdAt: -1 }); // newest first
+
+      if (activeSessions.length > 2) {
+        // Invalidate the oldest session(s)
+        const sessionsToDeactivate = activeSessions.slice(2);
+        for (const s of sessionsToDeactivate) {
+          s.isActive = false;
+          await s.save();
+        }
+      }
+    }
 
     res.status(200).json({ token });
   } catch (err) {
